@@ -1,39 +1,35 @@
 import { WebSocket, WebSocketServer } from 'ws';
 
+interface JoinPayload {
+    type: "join";
+    payload: {
+      roomId: string;
+      name: string;
+    };
+}
+  
+interface ChatPayload {
+    type: "chat";
+    payload: {
+      message: string;
+    };
+}
+  
+type WebSocketMessage = JoinPayload | ChatPayload;
+
+
+// ------------------- Further Enhancements - 1(A): START (Making a heartbeat function) --------------------------
+// function heartbeat() {
+//     this.isAlive = true;
+// }
+// ------------------- Further Enhancements - 1(A): END (Making a heartbeat function) -----------------------------
+
+
 // WebSocket server listening on port 8080
 const wss = new WebSocketServer({ port: 8080 });
 
-// wss.on('connection', function connection(ws) {
-//     console.log("WS-Connected");
-
-//     // Handle errors on the WebSocket connection
-//     ws.on('error', console.error);
-
-//     // Send a welcome message to the newly connected client
-//     ws.send('Hello Sockets');
-
-//     // let num:number = 1; 
-//     // ws.send(`The Number is: ${num}`);
-//     // setInterval(()=>{
-//     //     num+=1;
-//     //     ws.send(`The Number updated (after 05 sec): ${num}`);
-//     // },500)
-
-//     // Listen for incoming messages from clients
-//     ws.on('message', function message(data) {
-//         console.log('received: %s', data);
-
-//         if(data.toString() === "ping"){
-//             ws.send(`Pong`)
-//         } else {
-//             ws.send(`${data}`);
-//         };
-//     });
-// });
-
 // Log when the server is running
 console.log('WebSocket server is running on ws://localhost:8080');
-
 
 
 interface User{
@@ -43,22 +39,20 @@ interface User{
 };
 
 
-let userCount:number = 0;
-// let allWebSocket: WebSocket[] = [];
+// let userCount:number = 0;
 
 let allWebSocket: User[] = [];
 
-// [{socket:123, roomId:red, name:varun},{socket:124, roomId:red, name:ravi}]
-
-// {
-//     type: "chat",
-//     payload: {
-//         "message": "abcdefg"
-//     }
-// }
-
 wss.on("connection", (socket) => {
 
+    // --------------------- Further Enhancements - 1(B): START ---------------------
+    // socket.isAlive = true;
+    // socket.on("pong", heartbeat);
+
+    // --------------------- Further Enhancements - 1(B): END -----------------------
+
+
+    // -------------------------Trial Coad : Start ---------------------------------
     // allWebSocket.push(socket);
 
     // console.log("User Connected!")
@@ -74,15 +68,28 @@ wss.on("connection", (socket) => {
 
     //     allWebSocket.forEach(s => {
     //         s.send("Msg from the server: " + ev.toString());
-    //     })
-    //     socket.on("disconnect", ()=>{
-    //         allWebSocket.filter( o => o != socket )
-    //     });
+    //     }
     // })
 
-    socket.on("message", message => {
-        //@ts-ignore
-        const parsedMsg = JSON.parse(message);
+    // -------------------------Trial Coad : End ---------------------------------
+
+    socket.on("message", (message) => {
+        let parsedMsg;
+
+    try {
+        const messageString = message.toString();
+        parsedMsg = JSON.parse(messageString) as WebSocketMessage;
+    } catch (error) {
+        socket.send(JSON.stringify({ error: "Invalid JSON format" }));
+        return;
+    }
+
+    // Validate the parsed message structure
+    if (!parsedMsg || !parsedMsg.type || !parsedMsg.payload) {
+        socket.send(JSON.stringify({ error: "Invalid message format" }));
+        return;
+    }
+
         if(parsedMsg.type == "join"){
             allWebSocket.push({
                 socket,
@@ -108,10 +115,32 @@ wss.on("connection", (socket) => {
                 }
             }
 
-            for(let i=0; i<allWebSocket.length; i++){
-                //@ts-ignore
-                if(allWebSocket[i].roomId==currentUserRoom){
-                    allWebSocket[i].socket.send(currentUserName + ": " + parsedMsg.payload.message)
+            // for(let i=0; i<allWebSocket.length; i++){
+            //     //@ts-ignore
+            //     if(allWebSocket[i].roomId==currentUserRoom){
+            //         // allWebSocket[i].socket.send(currentUserName + ": " + parsedMsg.payload.message)
+                    
+            //         // ------ somthing i thought of and at backend it does json.parse() ------
+
+            //         allWebSocket[i].socket.send(JSON.stringify({
+            //             name: currentUserName,
+            //             message: parsedMsg.payload.message
+            //         }))
+
+            //         // -----------------------------------------------------------------------
+            //     }
+            // }
+
+            for (const user of allWebSocket) {
+                if (user.roomId === currentUserRoom) {
+                    try {
+                        user.socket.send(JSON.stringify({
+                            name: currentUserName,
+                            message: parsedMsg.payload.message,
+                        }));
+                    } catch (error) {
+                        console.error("Error sending message:", error);
+                    }
                 }
             }
         }
@@ -131,11 +160,18 @@ wss.on("connection", (socket) => {
             }
           });
         }
-      });
-
-    socket.on("disconnect", socket => {
-        allWebSocket.filter(x => x.socket != socket)
-    })
+    });
 })
 
+// ------------------- Further Enhancements - 1(C): START (Checking if socket is alive) --------------------------
 
+// setInterval(() => {
+//     wss.clients.forEach((socket) => {
+//       if (!socket.isAlive) return socket.terminate();
+  
+//       socket.isAlive = false;
+//       socket.ping();
+//     });
+// }, 30 * 1000);
+
+// ------------------ Further Enhancements - 1(C): END (Checking if socket is alive) ----------------------------
