@@ -91,12 +91,27 @@ wss.on("connection", (socket) => {
     }
 
         if(parsedMsg.type == "join"){
-            allWebSocket.push({
-                socket,
-                roomId: parsedMsg.payload.roomId,
-                name: parsedMsg.payload.name,
-            })
+            const { roomId, name } = parsedMsg.payload;
+            allWebSocket.push({ socket, roomId, name })
             console.log("User Connected!")
+            // Notify all users in the room about the new user
+            for (const user of allWebSocket) {
+                if (user.roomId === roomId) {
+                    try {
+                        user.socket.send(
+                        JSON.stringify({
+                            type: "system",
+                            payload: {
+                                name,
+                                message: `${name} has joined the room.`,
+                            },
+                        })
+                );
+            } catch (error) {
+                console.error("Error sending join notification:", error);
+            }
+        }
+    }
         }
 
         if(parsedMsg.type == "chat"){
