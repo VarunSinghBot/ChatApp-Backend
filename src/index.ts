@@ -7,7 +7,7 @@ interface JoinPayload {
       name: string;
     };
 }
-  
+    
 interface ChatPayload {
     type: "chat";
     payload: {
@@ -135,8 +135,11 @@ wss.on("connection", (socket) => {
                 if (user.roomId === currentUserRoom) {
                     try {
                         user.socket.send(JSON.stringify({
-                            name: currentUserName,
-                            message: parsedMsg.payload.message,
+                            type: "chat",
+                            payload: {
+                                name: currentUserName,
+                                message: parsedMsg.payload.message,
+                            }
                         }));
                     } catch (error) {
                         console.error("Error sending message:", error);
@@ -156,7 +159,17 @@ wss.on("connection", (socket) => {
           // Notify other users in the same room
           allWebSocket.forEach((user) => {
             if (user.roomId === disconnectedUser.roomId) {
-              user.socket.send(`${disconnectedUser.name} has left the room.`);
+                try{
+                    user.socket.send(JSON.stringify({
+                        type: "system",
+                        payload: {
+                            name: disconnectedUser.name,
+                            message: `${disconnectedUser.name} has left the room.`,
+                        }
+                    }));
+                }catch (error) {
+                    console.error("Error sending message:", error);
+                }
             }
           });
         }
